@@ -338,7 +338,7 @@ function ProjectDetailRoute() {
 // ── Root with BrowserRouter ────────────────────────
 export default function App() {
   return (
-    <BrowserRouter basename="/leader_pro">
+    <BrowserRouter basename="/Cms">
       <Routes>
         {/* Rutas públicas: nunca pasan por el guard de sesión de AppInner */}
         <Route path="/share/portfolio/:token" element={<SharePage scope="portfolio" />} />
