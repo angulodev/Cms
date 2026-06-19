@@ -68,3 +68,81 @@ export async function getMyAccess(companyId) {
   if (error) throw error
   return data
 }
+
+// ── Administración de Sistema: Usuarios ───────────────
+export async function listMembers(companyId) {
+  const { data, error } = await supabase.rpc('sys_list_members', { p_company_id: companyId })
+  if (error) throw error
+  return data || []
+}
+
+export async function changeMemberRole(companyId, userId, roleId) {
+  const { error } = await supabase.rpc('sys_change_member_role', {
+    p_company_id: companyId, p_user_id: userId, p_role_id: roleId,
+  })
+  if (error) throw error
+}
+
+export async function revokeMember(companyId, userId) {
+  const { error } = await supabase.rpc('sys_revoke_member', {
+    p_company_id: companyId, p_user_id: userId,
+  })
+  if (error) throw error
+}
+
+export async function reactivateMember(companyId, userId, roleId) {
+  const { error } = await supabase.rpc('sys_reactivate_member', {
+    p_company_id: companyId, p_user_id: userId, p_role_id: roleId,
+  })
+  if (error) throw error
+}
+
+// ── Administración de Sistema: Roles y permisos ───────
+export async function listRoles(companyId) {
+  const { data, error } = await supabase.rpc('sys_list_roles', { p_company_id: companyId })
+  if (error) throw error
+  return data || []
+}
+
+export async function listPermissions() {
+  const { data, error } = await supabase.rpc('sys_list_permissions')
+  if (error) throw error
+  return data || []
+}
+
+export async function createRole(companyId, name, description) {
+  const { data, error } = await supabase.rpc('sys_create_role', {
+    p_company_id: companyId, p_name: name, p_description: description || null,
+  })
+  if (error) throw error
+  return data // role_id
+}
+
+export async function updateRole(companyId, roleId, { name, description } = {}) {
+  const { error } = await supabase.rpc('sys_update_role', {
+    p_company_id: companyId, p_role_id: roleId,
+    p_name: name || null, p_description: description ?? null,
+  })
+  if (error) throw error
+}
+
+export async function updateRolePermissions(companyId, roleId, permissionIds) {
+  const { error } = await supabase.rpc('sys_update_role_permissions', {
+    p_company_id: companyId, p_role_id: roleId, p_permission_ids: permissionIds,
+  })
+  if (error) throw error
+}
+
+export async function deleteRole(companyId, roleId) {
+  const { error } = await supabase.rpc('sys_delete_role', {
+    p_company_id: companyId, p_role_id: roleId,
+  })
+  if (error) throw error
+}
+
+// ── Administración de Sistema: Módulos ────────────────
+export async function listCompanyModules(companyId) {
+  const { data, error } = await supabase.rpc('sys_list_company_modules', { p_company_id: companyId })
+  if (error) throw error
+  return data || []
+}

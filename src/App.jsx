@@ -17,6 +17,7 @@ import { getProjects, getActivity, getUserPrefs, supabase } from './lib/supabase
 import Login from './components/Login'
 import CompanyGate from './components/CompanyGate'
 import ModuleLauncher from './components/ModuleLauncher'
+import SystemAppShell from './components/system/SystemAppShell'
 import { getActiveCompanyId, clearActiveCompany } from './lib/activeCompany'
 import './index.css'
 
@@ -368,7 +369,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<ModuleLauncher />} />
               <Route path={`${MODULE_BASE}/*`} element={<ProjectsApp />} />
-              {/* /system/* se agrega en la siguiente fase (módulo de Administración de Sistema) */}
+              <Route path="/system/*" element={<SystemAppShell />} />
               <Route path="*" element={<ModuleLauncher />} />
             </Routes>
           </AuthGate>
