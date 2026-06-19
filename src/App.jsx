@@ -16,21 +16,46 @@ import ExportModal from './components/ExportModal'
 import { getProjects, getActivity, getUserPrefs, supabase } from './lib/supabase'
 import Login from './components/Login'
 import CompanyGate from './components/CompanyGate'
-import ModuleLauncher from './components/ModuleLauncher'
-import SystemAppShell from './components/system/SystemAppShell'
+import SysUsers from './components/system/Users'
+import SysRoles from './components/system/Roles'
+import SysModules from './components/system/Modules'
 import { getActiveCompanyId, clearActiveCompany } from './lib/activeCompany'
+import { getMyAccess } from './lib/company'
 import './index.css'
 
-const MODULE_BASE = '/projects-app'
-
-const NAV = [
-  { id: 'dashboard', path: `${MODULE_BASE}/`,          icon: 'grid_view',      label: 'Dashboard' },
-  { id: 'wall',      path: `${MODULE_BASE}/wall`,      icon: 'view_module',    label: 'Vista general' },
-  { id: 'projects',  path: `${MODULE_BASE}/projects`,  icon: 'folder_open',    label: 'Proyectos' },
-  { id: 'team',      path: `${MODULE_BASE}/team`,      icon: 'groups',         label: 'Equipo'    },
-  { id: 'workload',  path: `${MODULE_BASE}/workload`,  icon: 'balance',        label: 'Carga'     },
-  { id: 'reports',   path: `${MODULE_BASE}/reports`,   icon: 'bar_chart',      label: 'Reportes'  },
-  { id: 'export',    path: null,         icon: 'picture_as_pdf', label: 'Exportar'  },
+// ── Catálogo de módulos: cada uno es un acordeón en el sidebar.
+// "requiresPermission" oculta el módulo entero si el usuario no lo tiene.
+const MODULES = [
+  {
+    id: 'area_leader',
+    label: 'Administración de Proyectos',
+    icon: 'folder_open',
+    basePath: '/projects-app',
+    requiresPermission: null,
+    items: [
+      { id: 'dashboard', path: '',          icon: 'grid_view',   label: 'Dashboard' },
+      { id: 'wall',      path: 'wall',      icon: 'view_module', label: 'Vista general' },
+      { id: 'projects',  path: 'projects',  icon: 'folder_open', label: 'Proyectos' },
+      { id: 'team',      path: 'team',      icon: 'groups',      label: 'Equipo' },
+      { id: 'workload',  path: 'workload',  icon: 'balance',     label: 'Carga' },
+      { id: 'reports',   path: 'reports',   icon: 'bar_chart',   label: 'Reportes' },
+      { id: 'settings',  path: 'settings',  icon: 'settings',    label: 'Configuración' },
+    ],
+  },
+  {
+    id: 'sys_core',
+    label: 'Administración de Sistema',
+    icon: 'admin_panel_settings',
+    basePath: '/system',
+    requiresPermission: 'sys_core.company.manage',
+    items: [
+      { id: 'users',   path: 'users',   icon: 'group',                label: 'Usuarios' },
+      { id: 'roles',   path: 'roles',   icon: 'shield',               label: 'Roles y permisos' },
+      { id: 'modules', path: 'modules', icon: 'apps',                 label: 'Módulos' },
+    ],
+  },
+  // Próximos módulos: agregar aquí + sys_core.modules + su set de
+  // permisos + sus rutas en el <Routes> central de AppShell.
 ]
 
 // ── Auth + Company guard (envuelve TODA la app: launcher, módulos) ──
@@ -74,11 +99,16 @@ function AuthGate({ children }) {
   return children
 }
 
-// ── Area Leader Pro: shell propio (sidebar, topnav, rutas internas) ──
-function ProjectsApp() {
+// ── AppShell: shell ÚNICO y persistente para toda la app autenticada.
+// El sidebar muestra un acordeón por módulo (según permisos reales del
+// usuario); el <main> es lo único que cambia según la ruta.
+function AppShell() {
   const navigate  = useNavigate()
   const location  = useLocation()
+  const companyId = getActiveCompanyId()
 
+  const [access,         setAccess]         = useState(null)
+  const [expandedModule, setExpandedModule] = useState(null)
   const [sideOpen,       setSideOpen]       = useState(window.innerWidth > 640)
   const [sidePinned,     setSidePinned]     = useState(() => {
     const prefs = getUserPrefs()
@@ -95,7 +125,14 @@ function ProjectsApp() {
   const [allProjects, setAllProjects] = useState([])
 
   useEffect(() => {
+    let active = true
+
+    getMyAccess(companyId).then(data => {
+      if (active) setAccess(data)
+    }).catch(() => {})
+
     getProjects().then(p => {
+      if (!active) return
       setProjectCount(p.length)
       setAllProjects(p)
       setActiveProjects(
@@ -105,33 +142,57 @@ function ProjectsApp() {
       )
     }).catch(() => {})
     getActivity(20).then(items => {
+      if (!active) return
       const read = JSON.parse(localStorage.getItem('alp_read') || '[]')
       setUnreadCount(items.filter(i => !read.includes(i.id)).length)
     }).catch(() => {})
     const prefs = getUserPrefs()
     if (prefs.themeId) { const t = THEMES.find(t => t.id === prefs.themeId); if (t) applyTheme(t) }
     if (prefs.compact) document.documentElement.classList.add('compact')
+
+    return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
   }, [])
 
-  // Current nav id from path
-  const activeNav = location.pathname === `${MODULE_BASE}/` || location.pathname === MODULE_BASE ? 'dashboard'
-    : location.pathname.startsWith(`${MODULE_BASE}/wall`)      ? 'wall'
-    : location.pathname.startsWith(`${MODULE_BASE}/projects`)  ? 'projects'
-    : location.pathname.startsWith(`${MODULE_BASE}/team`)      ? 'team'
-    : location.pathname.startsWith(`${MODULE_BASE}/workload`)  ? 'workload'
-    : location.pathname.startsWith(`${MODULE_BASE}/reports`)   ? 'reports'
-    : 'dashboard'
+  // Módulos visibles según permisos reales del usuario en esta empresa
+  const myPermissions = new Set(access?.permissions || [])
+  const activeModuleIds = new Set((access?.modules || []).map(m => m.id))
+  const visibleModules = MODULES.filter(m => {
+    if (!activeModuleIds.has(m.id)) return false
+    if (m.requiresPermission && !myPermissions.has(m.requiresPermission)) return false
+    return true
+  })
+
+  // ¿Qué módulo y qué item están activos según la URL actual?
+  // La raíz '/' es un alias del dashboard de Proyectos, y el basePath
+  // exacto de un módulo (ej. '/system') es alias de su primer item,
+  // para que el sidebar siempre resalte algo coherente con lo que se ve.
+  const effectivePath = location.pathname === '/' ? '/projects-app/' : location.pathname
+  const currentModule = visibleModules.find(m => effectivePath.startsWith(m.basePath))
+  const currentItemId = currentModule?.items
+    .slice()
+    .sort((a, b) => b.path.length - a.path.length) // match más específico primero
+    .find(it => {
+      const isModuleRoot = effectivePath === currentModule.basePath || effectivePath === `${currentModule.basePath}/`
+      if (isModuleRoot) return it.path === '' || it === currentModule.items[0]
+      if (it.path === '') return false
+      const full = `${currentModule.basePath}/${it.path}`
+      return effectivePath.startsWith(full)
+    })?.id
+
+  // El acordeón del módulo activo se expande solo, salvo que el usuario
+  // haya tocado otro manualmente (expandedModule no-nulo manda).
+  const openModuleId = expandedModule ?? currentModule?.id ?? visibleModules[0]?.id
+
+  function goToItem(mod, item) {
+    navigate(`${mod.basePath}/${item.path}`)
+    if (!sidePinned) setSideOpen(false)
+  }
 
   const STATUS_COLOR = {
     active:'#10b981','at-risk':'#f59e0b',planning:'#3b82f6',
     'on-hold':'#8b5cf6',backlog:'#94a3b8',completed:'#06b6d4',
     cancelled:'#ef4444',closed:'#64748b'
-  }
-
-  function goNav(nav) {
-    if (nav.path === null) { setExportOpen(true); if (!sidePinned) setSideOpen(false); return }
-    navigate(nav.path)
-    if (!sidePinned) setSideOpen(false)
   }
 
   return (
@@ -143,7 +204,6 @@ function ProjectsApp() {
           title={sidePinned ? 'Desanclar sidebar' : sideOpen ? 'Cerrar sidebar' : 'Abrir sidebar'}
           onClick={() => {
             if (sidePinned) {
-              // Click when pinned = unpin + close
               setSidePinned(false)
               setSideOpen(false)
               try {
@@ -154,7 +214,6 @@ function ProjectsApp() {
                 // localStorage puede no estar disponible (modo privado, cuotas, etc.)
               }
             } else if (sideOpen) {
-              // Click when open (not pinned) = pin it
               setSidePinned(true)
               try {
                 const k = 'alp_user_prefs'
@@ -164,7 +223,6 @@ function ProjectsApp() {
                 // localStorage puede no estar disponible (modo privado, cuotas, etc.)
               }
             } else {
-              // Click when closed = open it
               setSideOpen(true)
             }
           }}>
@@ -176,9 +234,9 @@ function ProjectsApp() {
             {sidePinned ? 'push_pin' : sideOpen ? 'push_pin' : 'menu'}
           </span>
         </button>
-        <div className="brand" onClick={() => navigate(`${MODULE_BASE}/`)} style={{cursor:'pointer'}}>
+        <div className="brand" onClick={() => navigate('/')} style={{cursor:'pointer'}}>
           <div className="brand-icon"><span className="mat-icon">hub</span></div>
-          <span className="brand-name">Area Leader Pro</span>
+          <span className="brand-name">{access?.company?.name || 'Workspace'}</span>
         </div>
 
         <div className="topnav-search">
@@ -195,10 +253,10 @@ function ProjectsApp() {
                 p.name.toLowerCase().includes(q) || (p.client || '').toLowerCase().includes(q)
               )
               if (found) {
-                navigate(`${MODULE_BASE}/projects/${found.id}`, { state: { project: found } })
+                navigate(`/projects-app/projects/${found.id}`, { state: { project: found } })
                 setNavSearch('')
               } else {
-                navigate(`${MODULE_BASE}/projects?q=${encodeURIComponent(navSearch.trim())}`)
+                navigate(`/projects-app/projects?q=${encodeURIComponent(navSearch.trim())}`)
               }
             }}
           />
@@ -233,76 +291,115 @@ function ProjectsApp() {
       <div className="layout">
         {sideOpen && !sidePinned && <div className="sidebar-overlay" onClick={() => setSideOpen(false)} />}
 
-        {/* ── SIDEBAR ── */}
+        {/* ── SIDEBAR: acordeón por módulo ── */}
         <aside className={`sidenav ${sideOpen ? 'open' : ''} ${sidePinned ? 'pinned' : ''}`}>
           <div className="sidenav-inner">
             <nav className="sidenav-main">
-              <div className="sidenav-section-label">Principal</div>
-              {NAV.map(n => (
-                <button key={n.id}
-                  className={`nav-item ${n.id === 'export' ? (exportOpen ? 'active' : '') : activeNav === n.id ? 'active' : ''}`}
-                  onClick={() => goNav(n)}>
-                  <span className="mat-icon nav-icon">{n.icon}</span>
-                  <span>{n.label}</span>
-                  {n.id === 'projects' && projectCount > 0 &&
-                    <span className="nav-badge">{projectCount}</span>}
-                </button>
-              ))}
+              {visibleModules.map(mod => {
+                const isOpen = openModuleId === mod.id
+                return (
+                  <div key={mod.id} className="module-group">
+                    <button
+                      className={`module-group-header ${isOpen ? 'open' : ''}`}
+                      onClick={() => setExpandedModule(isOpen ? null : mod.id)}
+                    >
+                      <span className="mat-icon nav-icon">{mod.icon}</span>
+                      <span className="module-group-label">{mod.label}</span>
+                      <span className="mat-icon module-group-chevron">
+                        {isOpen ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </button>
+                    {isOpen && (
+                      <div className="module-group-items">
+                        {mod.items.map(item => {
+                          const isActive = currentModule?.id === mod.id && currentItemId === item.id
+                          return (
+                            <button
+                              key={item.id}
+                              className={`nav-item sub ${isActive ? 'active' : ''}`}
+                              onClick={() => goToItem(mod, item)}
+                            >
+                              <span className="mat-icon nav-icon">{item.icon}</span>
+                              <span>{item.label}</span>
+                              {item.id === 'projects' && projectCount > 0 &&
+                                <span className="nav-badge">{projectCount}</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </nav>
 
-            <div className="sidenav-projects-section">
-              <div className="sidenav-divider" />
-              <div className="sidenav-section-label">Proyectos activos</div>
-              {activeProjects.length === 0
-                ? <div style={{fontSize:11,color:'var(--text-muted)',padding:'4px 10px'}}>Sin proyectos activos</div>
-                : activeProjects.map(p => (
-                  <button key={p.id} className="nav-item nav-item-project"
-                    onClick={() => { navigate(`${MODULE_BASE}/projects/${p.id}`, { state: { project: p } }); if (!sidePinned) setSideOpen(false) }}>
-                    <span className="project-dot" style={{ background: STATUS_COLOR[p.status] || 'var(--accent)' }} />
-                    <span className="nav-item-project-label">{p.name}</span>
-                  </button>
-                ))
-              }
-            </div>
-
-            <div className="sidenav-bottom">
-              <div className="sidenav-divider" />
-              <button className="nav-item nav-item-settings"
-                onClick={() => { navigate(`${MODULE_BASE}/settings`); if (!sidePinned) setSideOpen(false) }}>
-                <span className="mat-icon nav-icon">settings</span>
-                <span>Configuración</span>
-              </button>
-            </div>
+            {currentModule?.id === 'area_leader' && (
+              <div className="sidenav-projects-section">
+                <div className="sidenav-divider" />
+                <div className="sidenav-section-label">Proyectos activos</div>
+                {activeProjects.length === 0
+                  ? <div style={{fontSize:11,color:'var(--text-muted)',padding:'4px 10px'}}>Sin proyectos activos</div>
+                  : activeProjects.map(p => (
+                    <button key={p.id} className="nav-item nav-item-project"
+                      onClick={() => { navigate(`/projects-app/projects/${p.id}`, { state: { project: p } }); if (!sidePinned) setSideOpen(false) }}>
+                      <span className="project-dot" style={{ background: STATUS_COLOR[p.status] || 'var(--accent)' }} />
+                      <span className="nav-item-project-label">{p.name}</span>
+                    </button>
+                  ))
+                }
+              </div>
+            )}
           </div>
         </aside>
 
-        {/* ── MAIN ── */}
+        {/* ── MAIN: una sola superficie de rutas para todos los módulos ── */}
         <main className="main">
           <Routes>
-            <Route path=""           element={<Dashboard onNavigate={p=>navigate(p==='projects'?`${MODULE_BASE}/projects`:p==='team'?`${MODULE_BASE}/team`:p==='workload'?`${MODULE_BASE}/workload`:`${MODULE_BASE}/`) } onExport={() => setExportOpen(true)} />} />
-            <Route path="wall"       element={<Wall onSelectProject={p => navigate(`${MODULE_BASE}/projects/${p.id}`, { state: { project: p } })} />} />
-            <Route path="projects"   element={<Projects  onSelectProject={p => navigate(`${MODULE_BASE}/projects/${p.id}`, { state: { project: p } })} />} />
-            <Route path="projects/:id" element={<ProjectDetailRoute key={location.pathname} />} />
-            <Route path="team"       element={<Team />} />
-            <Route path="workload"   element={<Workload />} />
-            <Route path="reports"    element={<Reports />} />
-            <Route path="settings"   element={<Settings />} />
+            {/* Raíz: entra directo al dashboard de Proyectos (o al primer módulo visible) */}
+            <Route path="/" element={
+              <Dashboard
+                onNavigate={p => navigate(p === 'projects' ? '/projects-app/projects' : p === 'team' ? '/projects-app/team' : p === 'workload' ? '/projects-app/workload' : '/projects-app/')}
+                onExport={() => setExportOpen(true)}
+              />
+            } />
+
+            {/* Administración de Proyectos */}
+            <Route path="/projects-app" element={<Dashboard onNavigate={p=>navigate(p==='projects'?'/projects-app/projects':p==='team'?'/projects-app/team':p==='workload'?'/projects-app/workload':'/projects-app/')} onExport={() => setExportOpen(true)} />} />
+            <Route path="/projects-app/wall"       element={<Wall onSelectProject={p => navigate(`/projects-app/projects/${p.id}`, { state: { project: p } })} />} />
+            <Route path="/projects-app/projects"   element={<Projects  onSelectProject={p => navigate(`/projects-app/projects/${p.id}`, { state: { project: p } })} />} />
+            <Route path="/projects-app/projects/:id" element={<ProjectDetailRoute key={location.pathname} />} />
+            <Route path="/projects-app/team"       element={<Team />} />
+            <Route path="/projects-app/workload"   element={<Workload />} />
+            <Route path="/projects-app/reports"    element={<Reports />} />
+            <Route path="/projects-app/settings"   element={<Settings />} />
+
+            {/* Administración de Sistema */}
+            <Route path="/system"        element={<SysUsers companyId={companyId} />} />
+            <Route path="/system/users"   element={<SysUsers companyId={companyId} />} />
+            <Route path="/system/roles"   element={<SysRoles companyId={companyId} />} />
+            <Route path="/system/modules" element={<SysModules companyId={companyId} />} />
+
             <Route path="*" element={<Dashboard onNavigate={p=>navigate(p)} onExport={() => setExportOpen(true)} />} />
           </Routes>
         </main>
       </div>
 
-      {/* ── BOTTOM NAV ── */}
-      <nav className="bottom-nav">
-        {NAV.map(n => (
-          <button key={n.id}
-            className={`bottom-nav-item ${n.id === 'export' ? (exportOpen ? 'active' : '') : activeNav === n.id ? 'active' : ''}`}
-            onClick={() => goNav(n)}>
-            <span className="mat-icon">{n.icon}</span>
-            <span>{n.label}</span>
-          </button>
-        ))}
-      </nav>
+      {/* ── BOTTOM NAV (mobile): items del módulo activo ── */}
+      {currentModule && (
+        <nav className="bottom-nav">
+          {currentModule.items.slice(0, 5).map(item => {
+            const isActive = currentItemId === item.id
+            return (
+              <button key={item.id}
+                className={`bottom-nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => goToItem(currentModule, item)}>
+                <span className="mat-icon">{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
+        </nav>
+      )}
 
       {exportOpen && <ExportModal onClose={() => setExportOpen(false)} />}
     </div>
@@ -326,7 +423,7 @@ function ProjectDetailRoute() {
       .then(projects => {
         const found = projects.find(p => p.id === id)
         if (found) setFetchedProject(found)
-        else navigate(`${MODULE_BASE}/projects`)
+        else navigate('/projects-app/projects')
       })
       .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate y stateProject son derivados estables de id; solo debe re-disparar cuando cambia el id de la ruta
@@ -343,7 +440,7 @@ function ProjectDetailRoute() {
   return (
     <ProjectDetail
       project={project}
-      onBack={() => navigate(`${MODULE_BASE}/projects`)}
+      onBack={() => navigate('/projects-app/projects')}
       onProjectUpdated={() => {
         getProjects().then(projects => {
           const found = projects.find(p => p.id === id)
@@ -363,15 +460,12 @@ export default function App() {
         <Route path="/share/portfolio/:token" element={<SharePage scope="portfolio" />} />
         <Route path="/share/project/:token"   element={<SharePage scope="project" />} />
 
-        {/* Todo lo demás requiere sesión + empresa activa */}
+        {/* Todo lo demás requiere sesión + empresa activa. AppShell es
+            el único shell: su propio <Routes> interno decide qué pintar
+            en <main> según la URL, sin recargar topnav/sidebar. */}
         <Route path="/*" element={
           <AuthGate>
-            <Routes>
-              <Route path="/" element={<ModuleLauncher />} />
-              <Route path={`${MODULE_BASE}/*`} element={<ProjectsApp />} />
-              <Route path="/system/*" element={<SystemAppShell />} />
-              <Route path="*" element={<ModuleLauncher />} />
-            </Routes>
+            <AppShell />
           </AuthGate>
         } />
       </Routes>
