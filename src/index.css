@@ -2533,6 +2533,79 @@ tbody tr:last-child td { border-bottom: none; }
   display: flex; justify-content: center;
 }
 
+/* ── CompanyGate: selector/creador de empresa ── */
+.cg-shell {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100dvh; background: var(--surface);
+  padding: 24px;
+}
+.cg-card {
+  width: 100%; max-width: 440px;
+  background: var(--surface-bright); border: 1px solid var(--border);
+  border-radius: 16px; padding: 32px;
+  box-shadow: 0 8px 32px rgba(15,23,42,.06);
+}
+.cg-header { text-align: center; margin-bottom: 24px; }
+.cg-brand-icon {
+  width: 48px; height: 48px; border-radius: 12px; margin: 0 auto 16px;
+  background: var(--accent); display: flex; align-items: center; justify-content: center;
+}
+.cg-brand-icon .mat-icon { color: white; font-size: 26px; }
+.cg-header h1 { font-size: 19px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; }
+.cg-header p { font-size: 13px; color: var(--text-muted); }
+
+.cg-pending-note {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-secondary);
+  background: var(--accent-bg); border-radius: 8px; padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.cg-company-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.cg-company-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 12px 14px; border-radius: 10px;
+  border: 1.5px solid var(--border); background: var(--surface);
+  cursor: pointer; transition: all .15s; text-align: left;
+  font-family: 'Inter', sans-serif;
+}
+.cg-company-item:hover { border-color: var(--accent); background: var(--accent-bg); }
+.cg-company-icon {
+  width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+  background: var(--accent-bg); display: flex; align-items: center; justify-content: center;
+  color: var(--accent); font-size: 18px;
+}
+.cg-company-info { flex: 1; min-width: 0; }
+.cg-company-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.cg-company-roles { font-size: 11px; color: var(--text-muted); text-transform: capitalize; }
+
+.cg-divider {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 12px; color: var(--text-muted); margin: 20px 0;
+}
+.cg-divider::before, .cg-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+.cg-create-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 12px 20px; border-radius: 10px;
+  border: 1.5px dashed var(--border); background: var(--surface);
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+  color: var(--text-secondary); cursor: pointer; transition: all .15s;
+}
+.cg-create-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+
+.cg-create-form { display: flex; flex-direction: column; gap: 8px; }
+
+.cg-logout-link {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin-top: 20px; padding-top: 16px;
+  border-top: 1px solid var(--border);
+  background: none; border-left: none; border-right: none; border-bottom: none;
+  font-size: 12px; color: var(--text-muted); cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+.cg-logout-link:hover { color: var(--error); }
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .lp-shell { flex-direction: column; }

@@ -15,6 +15,8 @@ import { applyTheme, THEMES } from './lib/theme'
 import ExportModal from './components/ExportModal'
 import { getProjects, getActivity, getUserPrefs, supabase } from './lib/supabase'
 import Login from './components/Login'
+import CompanyGate from './components/CompanyGate'
+import { getActiveCompanyId, clearActiveCompany } from './lib/activeCompany'
 import './index.css'
 
 const NAV = [
@@ -34,6 +36,7 @@ function AppInner() {
 
   const [session,        setSession]        = useState(null)
   const [authLoading,    setAuthLoading]    = useState(true)
+  const [companyId,      setCompanyId]      = useState(getActiveCompanyId)
   const [sideOpen,       setSideOpen]       = useState(window.innerWidth > 640)
   const [sidePinned,     setSidePinned]     = useState(() => {
     const prefs = getUserPrefs()
@@ -58,6 +61,13 @@ function AppInner() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setAuthLoading(false)
+      // Si la sesión se cierra (logout), también soltamos la empresa activa
+      // para que el próximo login (potencialmente otro usuario) pase por
+      // el selector de empresa de nuevo.
+      if (!session) {
+        clearActiveCompany()
+        setCompanyId(null)
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -114,6 +124,8 @@ function AppInner() {
   )
 
   if (!session) return <Login />
+
+  if (!companyId) return <CompanyGate onCompanySelected={setCompanyId} />
 
   return (
     <div className="app">

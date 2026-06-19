@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { getActiveCompanyId } from './activeCompany'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -17,6 +18,7 @@ export async function getTeamMembers() {
 
 export async function upsertMember(member) {
   const { data, error } = await supabase.rpc('al_upsert_member', {
+    p_company_id: getActiveCompanyId(),
     p_id:       member.id || null,
     p_name:     member.name,
     p_initials: member.initials,
@@ -30,12 +32,18 @@ export async function upsertMember(member) {
 }
 
 export async function deactivateMember(id) {
-  const { error } = await supabase.rpc('al_deactivate_member', { p_id: id })
+  const { error } = await supabase.rpc('al_deactivate_member', {
+    p_company_id: getActiveCompanyId(),
+    p_id: id,
+  })
   if (error) throw error
 }
 
 export async function activateMember(id) {
-  const { error } = await supabase.rpc('al_activate_member', { p_id: id })
+  const { error } = await supabase.rpc('al_activate_member', {
+    p_company_id: getActiveCompanyId(),
+    p_id: id,
+  })
   if (error) throw error
 }
 
@@ -52,6 +60,7 @@ export async function getAllMembers() {
 // ── Proyectos CRUD ────────────────────────────────
 export async function upsertProject(project) {
   const { data, error } = await supabase.rpc('al_upsert_project', {
+    p_company_id:  getActiveCompanyId(),
     p_id:          project.id || null,
     p_name:        project.name,
     p_client:      project.client || null,
@@ -108,7 +117,10 @@ export async function undoCancelPlan() {
 }
 
 export async function deleteProject(id) {
-  const { error } = await supabase.rpc('al_delete_project', { p_id: id })
+  const { error } = await supabase.rpc('al_delete_project', {
+    p_company_id: getActiveCompanyId(),
+    p_id: id,
+  })
   if (error) throw error
 }
 
@@ -155,6 +167,7 @@ export async function getActivity(limit = 10) {
 
 export async function addComment(projectId, actorId, content) {
   const { error } = await supabase.rpc('al_add_activity', {
+    p_company_id: getActiveCompanyId(),
     p_project_id: projectId,
     p_actor_id:   actorId || null,
     p_type:       'comment',
@@ -224,6 +237,7 @@ export async function getDashboardKPIs() {
 // ── Tasks CRUD ────────────────────────────────────
 export async function createTask(task) {
   const { data, error } = await supabase.rpc('al_upsert_task', {
+    p_company_id:  getActiveCompanyId(),
     p_id:          task.id || null,
     p_project_id:  task.project_id,
     p_assigned_to: task.assigned_to || null,
@@ -238,7 +252,10 @@ export async function createTask(task) {
 }
 
 export async function deleteTask(id) {
-  const { error } = await supabase.rpc('al_delete_task', { p_id: id })
+  const { error } = await supabase.rpc('al_delete_task', {
+    p_company_id: getActiveCompanyId(),
+    p_id: id,
+  })
   if (error) throw error
 }
 
@@ -253,14 +270,15 @@ export async function getProjectMembers(projectId) {
 }
 
 export async function toggleProjectMember(projectId, memberId, add) {
+  const p_company_id = getActiveCompanyId()
   if (add) {
     const { error } = await supabase.rpc('al_add_project_member', {
-      p_project_id: projectId, p_member_id: memberId
+      p_company_id, p_project_id: projectId, p_member_id: memberId
     })
     if (error) throw error
   } else {
     const { error } = await supabase.rpc('al_remove_project_member', {
-      p_project_id: projectId, p_member_id: memberId
+      p_company_id, p_project_id: projectId, p_member_id: memberId
     })
     if (error) throw error
   }
@@ -301,6 +319,7 @@ export async function getRisksByProject(projectId) {
 
 export async function upsertRisk(risk) {
   const { data, error } = await supabase.rpc('al_upsert_risk', {
+    p_company_id:   getActiveCompanyId(),
     p_id:           risk.id || null,
     p_project_id:   risk.project_id,
     p_title:        risk.title,
@@ -315,7 +334,10 @@ export async function upsertRisk(risk) {
 }
 
 export async function deleteRisk(id) {
-  const { error } = await supabase.rpc('al_delete_risk', { p_id: id })
+  const { error } = await supabase.rpc('al_delete_risk', {
+    p_company_id: getActiveCompanyId(),
+    p_id: id,
+  })
   if (error) throw error
 }
 
