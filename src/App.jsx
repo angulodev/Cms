@@ -16,43 +16,28 @@ import ExportModal from './components/ExportModal'
 import { getProjects, getActivity, getUserPrefs, supabase } from './lib/supabase'
 import Login from './components/Login'
 import CompanyGate from './components/CompanyGate'
+import ModuleLauncher from './components/ModuleLauncher'
 import { getActiveCompanyId, clearActiveCompany } from './lib/activeCompany'
 import './index.css'
 
+const MODULE_BASE = '/projects-app'
+
 const NAV = [
-  { id: 'dashboard', path: '/',          icon: 'grid_view',      label: 'Dashboard' },
-  { id: 'wall',      path: '/wall',      icon: 'view_module',    label: 'Vista general' },
-  { id: 'projects',  path: '/projects',  icon: 'folder_open',    label: 'Proyectos' },
-  { id: 'team',      path: '/team',      icon: 'groups',         label: 'Equipo'    },
-  { id: 'workload',  path: '/workload',  icon: 'balance',        label: 'Carga'     },
-  { id: 'reports',   path: '/reports',   icon: 'bar_chart',      label: 'Reportes'  },
+  { id: 'dashboard', path: `${MODULE_BASE}/`,          icon: 'grid_view',      label: 'Dashboard' },
+  { id: 'wall',      path: `${MODULE_BASE}/wall`,      icon: 'view_module',    label: 'Vista general' },
+  { id: 'projects',  path: `${MODULE_BASE}/projects`,  icon: 'folder_open',    label: 'Proyectos' },
+  { id: 'team',      path: `${MODULE_BASE}/team`,      icon: 'groups',         label: 'Equipo'    },
+  { id: 'workload',  path: `${MODULE_BASE}/workload`,  icon: 'balance',        label: 'Carga'     },
+  { id: 'reports',   path: `${MODULE_BASE}/reports`,   icon: 'bar_chart',      label: 'Reportes'  },
   { id: 'export',    path: null,         icon: 'picture_as_pdf', label: 'Exportar'  },
 ]
 
-// ── Inner app (needs router context) ──────────────
-function AppInner() {
-  const navigate  = useNavigate()
-  const location  = useLocation()
+// ── Auth + Company guard (envuelve TODA la app: launcher, módulos) ──
+function AuthGate({ children }) {
+  const [session,     setSession]     = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [companyId,   setCompanyId]   = useState(getActiveCompanyId)
 
-  const [session,        setSession]        = useState(null)
-  const [authLoading,    setAuthLoading]    = useState(true)
-  const [companyId,      setCompanyId]      = useState(getActiveCompanyId)
-  const [sideOpen,       setSideOpen]       = useState(window.innerWidth > 640)
-  const [sidePinned,     setSidePinned]     = useState(() => {
-    const prefs = getUserPrefs()
-    return prefs.sidebarPinned !== false && window.innerWidth > 640
-  })
-  const [notifOpen,      setNotifOpen]      = useState(false)
-  const [profileOpen,    setProfileOpen]    = useState(false)
-  const [exportOpen,     setExportOpen]     = useState(false)
-  const [projectCount,   setProjectCount]   = useState(null)
-  const [activeProjects, setActiveProjects] = useState([])
-  const [unreadCount,    setUnreadCount]    = useState(0)
-  const [userPrefs, setUserPrefs] = useState(getUserPrefs)
-  const [navSearch, setNavSearch] = useState('')
-  const [allProjects, setAllProjects] = useState([])
-
-  // Auth listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -72,8 +57,43 @@ function AppInner() {
     return () => subscription.unsubscribe()
   }, [])
 
+  if (authLoading) return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100dvh',background:'var(--surface)'}}>
+      <div style={{textAlign:'center',color:'var(--text-muted)'}}>
+        <span className="mat-icon spin" style={{fontSize:36,display:'block',marginBottom:8}}>hub</span>
+        <div style={{fontSize:14,fontWeight:600}}>Area Leader Pro</div>
+      </div>
+    </div>
+  )
+
+  if (!session) return <Login />
+
+  if (!companyId) return <CompanyGate onCompanySelected={setCompanyId} />
+
+  return children
+}
+
+// ── Area Leader Pro: shell propio (sidebar, topnav, rutas internas) ──
+function ProjectsApp() {
+  const navigate  = useNavigate()
+  const location  = useLocation()
+
+  const [sideOpen,       setSideOpen]       = useState(window.innerWidth > 640)
+  const [sidePinned,     setSidePinned]     = useState(() => {
+    const prefs = getUserPrefs()
+    return prefs.sidebarPinned !== false && window.innerWidth > 640
+  })
+  const [notifOpen,      setNotifOpen]      = useState(false)
+  const [profileOpen,    setProfileOpen]    = useState(false)
+  const [exportOpen,     setExportOpen]     = useState(false)
+  const [projectCount,   setProjectCount]   = useState(null)
+  const [activeProjects, setActiveProjects] = useState([])
+  const [unreadCount,    setUnreadCount]    = useState(0)
+  const [userPrefs, setUserPrefs] = useState(getUserPrefs)
+  const [navSearch, setNavSearch] = useState('')
+  const [allProjects, setAllProjects] = useState([])
+
   useEffect(() => {
-    if (!session) return
     getProjects().then(p => {
       setProjectCount(p.length)
       setAllProjects(p)
@@ -90,16 +110,15 @@ function AppInner() {
     const prefs = getUserPrefs()
     if (prefs.themeId) { const t = THEMES.find(t => t.id === prefs.themeId); if (t) applyTheme(t) }
     if (prefs.compact) document.documentElement.classList.add('compact')
-  }, [session])
+  }, [])
 
   // Current nav id from path
-  const activeNav = location.pathname === '/'           ? 'dashboard'
-    : location.pathname.startsWith('/wall')             ? 'wall'
-    : location.pathname.startsWith('/projects/')        ? 'projects'
-    : location.pathname.startsWith('/projects')         ? 'projects'
-    : location.pathname.startsWith('/team')             ? 'team'
-    : location.pathname.startsWith('/workload')         ? 'workload'
-    : location.pathname.startsWith('/reports')          ? 'reports'
+  const activeNav = location.pathname === `${MODULE_BASE}/` || location.pathname === MODULE_BASE ? 'dashboard'
+    : location.pathname.startsWith(`${MODULE_BASE}/wall`)      ? 'wall'
+    : location.pathname.startsWith(`${MODULE_BASE}/projects`)  ? 'projects'
+    : location.pathname.startsWith(`${MODULE_BASE}/team`)      ? 'team'
+    : location.pathname.startsWith(`${MODULE_BASE}/workload`)  ? 'workload'
+    : location.pathname.startsWith(`${MODULE_BASE}/reports`)   ? 'reports'
     : 'dashboard'
 
   const STATUS_COLOR = {
@@ -113,19 +132,6 @@ function AppInner() {
     navigate(nav.path)
     if (!sidePinned) setSideOpen(false)
   }
-
-  if (authLoading) return (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100dvh',background:'var(--surface)'}}>
-      <div style={{textAlign:'center',color:'var(--text-muted)'}}>
-        <span className="mat-icon spin" style={{fontSize:36,display:'block',marginBottom:8}}>hub</span>
-        <div style={{fontSize:14,fontWeight:600}}>Area Leader Pro</div>
-      </div>
-    </div>
-  )
-
-  if (!session) return <Login />
-
-  if (!companyId) return <CompanyGate onCompanySelected={setCompanyId} />
 
   return (
     <div className="app">
@@ -169,7 +175,7 @@ function AppInner() {
             {sidePinned ? 'push_pin' : sideOpen ? 'push_pin' : 'menu'}
           </span>
         </button>
-        <div className="brand" onClick={() => navigate('/')} style={{cursor:'pointer'}}>
+        <div className="brand" onClick={() => navigate(`${MODULE_BASE}/`)} style={{cursor:'pointer'}}>
           <div className="brand-icon"><span className="mat-icon">hub</span></div>
           <span className="brand-name">Area Leader Pro</span>
         </div>
@@ -188,10 +194,10 @@ function AppInner() {
                 p.name.toLowerCase().includes(q) || (p.client || '').toLowerCase().includes(q)
               )
               if (found) {
-                navigate(`/projects/${found.id}`, { state: { project: found } })
+                navigate(`${MODULE_BASE}/projects/${found.id}`, { state: { project: found } })
                 setNavSearch('')
               } else {
-                navigate(`/projects?q=${encodeURIComponent(navSearch.trim())}`)
+                navigate(`${MODULE_BASE}/projects?q=${encodeURIComponent(navSearch.trim())}`)
               }
             }}
           />
@@ -250,7 +256,7 @@ function AppInner() {
                 ? <div style={{fontSize:11,color:'var(--text-muted)',padding:'4px 10px'}}>Sin proyectos activos</div>
                 : activeProjects.map(p => (
                   <button key={p.id} className="nav-item nav-item-project"
-                    onClick={() => { navigate(`/projects/${p.id}`, { state: { project: p } }); if (!sidePinned) setSideOpen(false) }}>
+                    onClick={() => { navigate(`${MODULE_BASE}/projects/${p.id}`, { state: { project: p } }); if (!sidePinned) setSideOpen(false) }}>
                     <span className="project-dot" style={{ background: STATUS_COLOR[p.status] || 'var(--accent)' }} />
                     <span className="nav-item-project-label">{p.name}</span>
                   </button>
@@ -261,7 +267,7 @@ function AppInner() {
             <div className="sidenav-bottom">
               <div className="sidenav-divider" />
               <button className="nav-item nav-item-settings"
-                onClick={() => { navigate('/settings'); if (!sidePinned) setSideOpen(false) }}>
+                onClick={() => { navigate(`${MODULE_BASE}/settings`); if (!sidePinned) setSideOpen(false) }}>
                 <span className="mat-icon nav-icon">settings</span>
                 <span>Configuración</span>
               </button>
@@ -272,14 +278,14 @@ function AppInner() {
         {/* ── MAIN ── */}
         <main className="main">
           <Routes>
-            <Route path="/"           element={<Dashboard onNavigate={p=>navigate(p==='projects'?'/projects':p==='team'?'/team':p==='workload'?'/workload':'/') } onExport={() => setExportOpen(true)} />} />
-            <Route path="/wall"       element={<Wall onSelectProject={p => navigate(`/projects/${p.id}`, { state: { project: p } })} />} />
-            <Route path="/projects"   element={<Projects  onSelectProject={p => navigate(`/projects/${p.id}`, { state: { project: p } })} />} />
-            <Route path="/projects/:id" element={<ProjectDetailRoute key={location.pathname} />} />
-            <Route path="/team"       element={<Team />} />
-            <Route path="/workload"   element={<Workload />} />
-            <Route path="/reports"    element={<Reports />} />
-            <Route path="/settings"   element={<Settings />} />
+            <Route path=""           element={<Dashboard onNavigate={p=>navigate(p==='projects'?`${MODULE_BASE}/projects`:p==='team'?`${MODULE_BASE}/team`:p==='workload'?`${MODULE_BASE}/workload`:`${MODULE_BASE}/`) } onExport={() => setExportOpen(true)} />} />
+            <Route path="wall"       element={<Wall onSelectProject={p => navigate(`${MODULE_BASE}/projects/${p.id}`, { state: { project: p } })} />} />
+            <Route path="projects"   element={<Projects  onSelectProject={p => navigate(`${MODULE_BASE}/projects/${p.id}`, { state: { project: p } })} />} />
+            <Route path="projects/:id" element={<ProjectDetailRoute key={location.pathname} />} />
+            <Route path="team"       element={<Team />} />
+            <Route path="workload"   element={<Workload />} />
+            <Route path="reports"    element={<Reports />} />
+            <Route path="settings"   element={<Settings />} />
             <Route path="*" element={<Dashboard onNavigate={p=>navigate(p)} onExport={() => setExportOpen(true)} />} />
           </Routes>
         </main>
@@ -319,7 +325,7 @@ function ProjectDetailRoute() {
       .then(projects => {
         const found = projects.find(p => p.id === id)
         if (found) setFetchedProject(found)
-        else navigate('/projects')
+        else navigate(`${MODULE_BASE}/projects`)
       })
       .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate y stateProject son derivados estables de id; solo debe re-disparar cuando cambia el id de la ruta
@@ -336,7 +342,7 @@ function ProjectDetailRoute() {
   return (
     <ProjectDetail
       project={project}
-      onBack={() => navigate('/projects')}
+      onBack={() => navigate(`${MODULE_BASE}/projects`)}
       onProjectUpdated={() => {
         getProjects().then(projects => {
           const found = projects.find(p => p.id === id)
@@ -352,11 +358,21 @@ export default function App() {
   return (
     <BrowserRouter basename="/Cms">
       <Routes>
-        {/* Rutas públicas: nunca pasan por el guard de sesión de AppInner */}
+        {/* Rutas públicas: nunca pasan por el guard de sesión */}
         <Route path="/share/portfolio/:token" element={<SharePage scope="portfolio" />} />
         <Route path="/share/project/:token"   element={<SharePage scope="project" />} />
-        {/* Todo lo demás pasa por la app autenticada normal */}
-        <Route path="/*" element={<AppInner />} />
+
+        {/* Todo lo demás requiere sesión + empresa activa */}
+        <Route path="/*" element={
+          <AuthGate>
+            <Routes>
+              <Route path="/" element={<ModuleLauncher />} />
+              <Route path={`${MODULE_BASE}/*`} element={<ProjectsApp />} />
+              {/* /system/* se agrega en la siguiente fase (módulo de Administración de Sistema) */}
+              <Route path="*" element={<ModuleLauncher />} />
+            </Routes>
+          </AuthGate>
+        } />
       </Routes>
     </BrowserRouter>
   )

@@ -59,3 +59,12 @@ export async function getAuditLog(companyId, { limit = 50, resource = null } = {
   if (error) throw error
   return data || []
 }
+
+// Acceso completo del usuario en la empresa activa: módulos activos,
+// permisos planos (ej. 'area_leader.project.create') y roles (nombres).
+// Es la única llamada que el Launcher y los guards de módulo necesitan.
+export async function getMyAccess(companyId) {
+  const { data, error } = await supabase.rpc('sys_get_my_access', { p_company_id: companyId })
+  if (error) throw error
+  return data
+}
