@@ -2987,3 +2987,63 @@ tbody tr:last-child td { border-bottom: none; }
   border-left: 2px solid var(--border);
 }
 .module-group-items .nav-item.sub { margin-left: 4px; }
+
+/* ── Sistema: Tabla global de usuarios (estilo ServiceNow sys_user) ── */
+.sys-table-search {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 10px;
+  background: var(--surface-bright); border: 1.5px solid var(--border);
+  margin-bottom: 14px; max-width: 360px;
+}
+.sys-table-search input {
+  flex: 1; border: none; background: none; outline: none;
+  font-size: 13px; font-family: 'Inter', sans-serif; color: var(--text-primary);
+}
+
+.sys-table-wrap {
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--surface-bright);
+}
+.sys-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.sys-table thead tr { background: var(--surface); }
+.sys-table th {
+  text-align: left; padding: 10px 14px; font-weight: 700;
+  color: var(--text-secondary); font-size: 11px; text-transform: uppercase;
+  letter-spacing: .4px; border-bottom: 1px solid var(--border);
+}
+.sys-table td {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  color: var(--text-primary); vertical-align: middle;
+}
+.sys-table tbody tr { cursor: pointer; transition: background .1s; }
+.sys-table tbody tr:hover { background: var(--accent-bg); }
+.sys-table tbody tr:last-child td { border-bottom: none; }
+.sys-table-row-active { background: var(--accent-bg); }
+.sys-table-user-cell { display: flex; align-items: center; gap: 8px; }
+
+.sys-table-nested { font-size: 12px; }
+.sys-table-nested th, .sys-table-nested td { padding: 8px 10px; }
+
+.modal-xl { max-width: 760px; }
+@media (max-width: 900px) { .modal-xl { max-width: 100%; } }
+
+.sys-user-detail-header {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+}
+.sys-user-detail-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.sys-user-detail-email { font-size: 12px; color: var(--text-muted); }
+
+.sys-user-detail-fields {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  margin-bottom: 20px;
+}
+.sys-detail-field { display: flex; flex-direction: column; gap: 2px; }
+.sys-detail-field-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: .3px; }
+.sys-detail-field span:last-child { font-size: 13px; color: var(--text-primary); }
+
+.sys-related-list-header {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}

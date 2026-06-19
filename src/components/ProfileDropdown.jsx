@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase, getUserPrefs, saveUserPrefs } from '../lib/supabase'
+import { clearActiveCompany } from '../lib/activeCompany'
 import { Avatar, ConfirmModal } from './UI'
 
 const AVATAR_COLORS = ['#1e293b','#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899']
@@ -34,6 +35,11 @@ export default function ProfileDropdown({ onClose, onSaved }) {
   }
 
   const initials = form.name.trim().split(' ').slice(0,2).map(w => w[0]?.toUpperCase() || '').join('')
+
+  function handleSwitchCompany() {
+    clearActiveCompany()
+    window.location.reload() // fuerza a AuthGate a re-evaluar companyId desde cero
+  }
 
   return (
     <div className="user-panel" ref={panelRef}>
@@ -88,6 +94,17 @@ export default function ProfileDropdown({ onClose, onSaved }) {
             {saved
               ? <><span className="mat-icon">check_circle</span> Guardado</>
               : <><span className="mat-icon">save</span> Guardar perfil</>}
+          </button>
+
+          <div className="pref-divider" />
+
+          <button
+            className="btn btn-ghost"
+            style={{ width:'100%', justifyContent:'center' }}
+            onClick={handleSwitchCompany}
+          >
+            <span className="mat-icon">swap_horiz</span>
+            Cambiar empresa
           </button>
 
           <div className="pref-divider" />

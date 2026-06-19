@@ -146,3 +146,34 @@ export async function listCompanyModules(companyId) {
   if (error) throw error
   return data || []
 }
+
+// ── Super-admin de plataforma: vista global de usuarios (sys_user) ──
+export async function amIPlatformAdmin() {
+  const { data, error } = await supabase.rpc('sys_am_i_platform_admin')
+  if (error) throw error
+  return !!data
+}
+
+export async function listAllUsers() {
+  const { data, error } = await supabase.rpc('sys_list_all_users')
+  if (error) throw error
+  return data || []
+}
+
+export async function getUserDetail(userId) {
+  const { data, error } = await supabase.rpc('sys_get_user_detail', { p_user_id: userId })
+  if (error) throw error
+  return data
+}
+
+export async function setUserActive(userId, active) {
+  const { error } = await supabase.rpc('sys_set_user_active', { p_user_id: userId, p_active: active })
+  if (error) throw error
+}
+
+export async function adminRemoveUserFromCompany(userId, companyId) {
+  const { error } = await supabase.rpc('sys_admin_remove_user_from_company', {
+    p_user_id: userId, p_company_id: companyId,
+  })
+  if (error) throw error
+}
